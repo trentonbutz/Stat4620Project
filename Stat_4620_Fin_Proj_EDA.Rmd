@@ -1,0 +1,99 @@
+---
+title: "Stat 4620 Final Project Initial EDA"
+author: "Nicolas Brizzi"
+date: "2022-11-28"
+output: html_document
+---
+
+```{r}
+library(dplyr)
+library(magrittr)
+library(tidyr)
+library(GGally)
+```
+
+```{r}
+train = read.csv("/Users/Nick/Downloads/Ames/train.csv")
+```
+
+## EDA 
+
+Frequency of data types in the Ames frame:
+```{r}
+table(sapply(train, class))
+```
+About half and half - slightly more character data types. 
+
+Quick data summaries.
+```{r}
+summary(train)
+```
+
+How much data is missing?
+```{r}
+sum(is.na(train))
+```
+6965 different values are NA
+
+Let's replace those NA values with 0 or None depending on the variable type. 
+```{r}
+for (i in 1:length(names(train))) {
+  if(class(train[[i]]) == "character") {
+    train[[i]] <- train[[i]] %>% replace_na("None")
+  }
+  else {
+    train[[i]] <- train[[i]] %>% replace_na(0)
+  }
+}
+```
+
+```{r}
+sum(is.na(train))
+```
+
+### Seeing if there is any linear relationships between some of the numeric predictors that we can pick up on. 
+
+Looking
+```{r}
+train %>%
+  select(contains("Garage")) %>%
+  select_if(is.numeric) %>%
+  ggpairs()
+```
+It looks like 'GarageCars' and 'GarageArea' have a very high linear correlation, which is to be expected. 
+The other garage variables have moderately strong linear correlations amongst themselves. 
+
+Variables that contain "Overall"
+```{r}
+train %>%
+  select(contains("Overall")) %>%
+  select_if(is.numeric) %>%
+  ggpairs()
+```
+
+How much can Overall Quality tell us about the house sale price?
+```{r}
+lm(SalePrice ~ OverallQual, data = train) %>%
+  summary()
+```
+R-squared of ~.63, decently strong correlation for just one variable. This most likely will be included in the model that we end up on. 
+
+
+Variables that contain "SF" or Square Feet
+```{r}
+train %>%
+  select(contains("SF")) %>%
+  select_if(is.numeric) %>%
+  ggpairs()
+```
+There's a lot going on but there are some strong correlations here. 
+- '1stFlrSF' and 'TotalBsmtSF' have a correlation of .820
+- 'BsmtFinSF1' and 'TotalBsmtSF' have a correlation of .522
+
+All other correlations are below .5. 
+
+## Initial Considerations
+
+So far there is a lot of character variables that can be interpreted as ordinal, and a lot of numeric variables. These variables are good for techniques that have a lot of quantitative variables that have complex, and perhaps non-linear, relationships among each other. It can potentially eliminate a lot of factors and retain an accurate model. 
+
+It will be important to decide on what factors to convert into numeric values, and what variables to exclude from the model as a whole. 
