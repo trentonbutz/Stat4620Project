@@ -10,10 +10,14 @@ library(dplyr)
 library(magrittr)
 library(tidyr)
 library(GGally)
+library(MASS)
+library(pls)
 ```
 
+Reading in data
 ```{r}
 train = read.csv("/Users/Nick/Downloads/Ames/train.csv")
+test = read.csv("/Users/Nick/Downloads/Ames/test_new.csv")
 ```
 
 ## EDA 
@@ -56,17 +60,17 @@ sum(is.na(train))
 Looking
 ```{r}
 train %>%
-  select(contains("Garage")) %>%
+  dplyr::select(contains("Garage")) %>%
   select_if(is.numeric) %>%
   ggpairs()
 ```
 It looks like 'GarageCars' and 'GarageArea' have a very high linear correlation, which is to be expected. 
-The other garage variables have moderately strong linear correlations amongst themselves. 
+The other garage variables have moderately strong linear correlations amongst themselves. Perhaps we only keep 'GarageArea'.
 
 Variables that contain "Overall"
 ```{r}
 train %>%
-  select(contains("Overall")) %>%
+  dplyr::select(contains("Overall")) %>%
   select_if(is.numeric) %>%
   ggpairs()
 ```
@@ -82,7 +86,7 @@ R-squared of ~.63, decently strong correlation for just one variable. This most 
 Variables that contain "SF" or Square Feet
 ```{r}
 train %>%
-  select(contains("SF")) %>%
+  dplyr::select(contains("SF")) %>%
   select_if(is.numeric) %>%
   ggpairs()
 ```
@@ -97,3 +101,44 @@ All other correlations are below .5.
 So far there is a lot of character variables that can be interpreted as ordinal, and a lot of numeric variables. These variables are good for techniques that have a lot of quantitative variables that have complex, and perhaps non-linear, relationships among each other. It can potentially eliminate a lot of factors and retain an accurate model. 
 
 It will be important to decide on what factors to convert into numeric values, and what variables to exclude from the model as a whole. 
+
+```{r}
+train %>%
+  dplyr::select(-BsmtFinSF1,-X1stFlrSF, -GarageCars, -GarageYrBlt)
+```
+
+###Initial PCR model
+```{r}
+set.seed(2048)
+pcr.fit = pcr(SalePrice ~., data = train %>%
+                dplyr::select(-BsmtFinSF1,-X1stFlrSF, -GarageCars, -GarageYrBlt) %>%
+                select_if(is.numeric),
+              scale = TRUE, validation = "CV")
+summary(pcr.fit)
+```
+70% of the variation in SalePrice is explained by the first component. It plateaus quickly after that. It would be productive to move over to PLS to get the components that are explaining SalePrice and X, so we only need the first 5-10 components to get up to 80% variability explained in Y, by my estimations. 
+
+Looking at cross validation plot of Mean Squared Error by # of Components. Barely changes after the first couple of components.
+```{r}
+validationplot(pcr.fit, val.type = "MSEP")
+```
+
+First PLS model
+```{r}
+pls.fit = plsr(SalePrice ~., data = train %>%
+                dplyr::select(-BsmtFinSF1,-X1stFlrSF, -GarageCars, -GarageYrBlt) %>%
+                select_if(is.numeric),
+              scale = TRUE, validation = "CV")
+summary(pls.fit)
+```
+First 3 components explain 80.13% of the variation in Y, and it levels off after that. 4-5 would be the most that would be worth considering.
+
+
+Looking at cross validation plot of Mean Squared Error by # of Components.
+```{r}
+validationplot(pls.fit, val.type = "MSEP")
+```
+Stable after 3 components.
+
+
+The questions that arise are whether the performance would be consistent on the testing data, and whether the categorical variables (some of the factors) would be worth putting into the final model.
