@@ -1,0 +1,83 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(readr)
+library(tidyverse)
+library(glmnet)
+
+
+train = read_csv("train.csv")
+test = read_csv("test_new.csv")
+```
+
+```{r}
+for (i in 1:length(names(train))) {
+  if(class(train[[i]]) == "character") {
+    train[[i]] <- train[[i]] %>% replace_na("None")
+  }
+  else {
+    train[[i]] <- train[[i]] %>% replace_na(0)
+  }
+}
+
+for (i in 1:length(names(test))) {
+  if(class(test[[i]]) == "character") {
+    test[[i]] <- test[[i]] %>% replace_na("None")
+  }
+  else {
+    test[[i]] <- test[[i]] %>% replace_na(0)
+  }
+}
+```
+
+```{r}
+train_y = train$SalePrice
+train_x = model.matrix(SalePrice~., train)[, -1]
+
+test_y = test$SalePrice
+test_x = model.matrix(SalePrice~., test)[, -1]
+
+missing_cols = setdiff(colnames(train_x),colnames(test_x))
+missing = matrix(ncol = length(missing_cols), nrow = (nrow(test_x)))
+colnames(missing) = missing_cols
+missing[is.na(missing)] = 0
+
+test_x = cbind(test_x, missing)
+test_x = test_x[,!colnames(test_x) %in% setdiff(colnames(test_x), colnames(train_x))]
+
+```
+
+```{r}
+set.seed(100)
+lasso_cv = cv.glmnet(train_x,train_y,alpha=1)
+
+plot(lasso_cv)
+plot(lasso_cv$lambda,lasso_cv$cvm,xlim=c(0,100000))
+
+lambda_cv = lasso_cv$lambda.min 
+lambda_cv
+```
+
+```{r}
+fit_lasso = glmnet(train_x,train_y,alpha=1, lambda=lambda_cv)
+coef(fit_lasso)
+```
+
+```{r}
+pred_lasso = predict(fit_lasso,newx=test_x)
+mean((test_y-pred_lasso)^2)
+```
+
+```{r}
+plot(test_y, pred_lasso)
+```
+
+
+
+
+
+
+
