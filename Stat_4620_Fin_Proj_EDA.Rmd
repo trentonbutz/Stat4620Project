@@ -12,6 +12,7 @@ library(tidyr)
 library(GGally)
 library(MASS)
 library(pls)
+library(ggplot2)
 ```
 
 Reading in data
@@ -49,10 +50,20 @@ for (i in 1:length(names(train))) {
     train[[i]] <- train[[i]] %>% replace_na(0)
   }
 }
+
+for (i in 1:length(names(test))) {
+  if(class(test[[i]]) == "character") {
+    test[[i]] <- test[[i]] %>% replace_na("None")
+  }
+  else {
+    test[[i]] <- test[[i]] %>% replace_na(0)
+  }
+}
 ```
 
 ```{r}
 sum(is.na(train))
+sum(is.na(test))
 ```
 
 ### Seeing if there is any linear relationships between some of the numeric predictors that we can pick up on. 
@@ -125,13 +136,14 @@ validationplot(pcr.fit, val.type = "MSEP")
 
 First PLS model
 ```{r}
+set.seed(196)
 pls.fit = plsr(SalePrice ~., data = train %>%
                 dplyr::select(-BsmtFinSF1,-X1stFlrSF, -GarageCars, -GarageYrBlt) %>%
                 select_if(is.numeric),
               scale = TRUE, validation = "CV")
 summary(pls.fit)
 ```
-First 3 components explain 80.13% of the variation in Y, and it levels off after that. 4-5 would be the most that would be worth considering.
+First 3 components explain 80.13% of the variation in Y, and it levels off after that. 4-6 would be the most that would be worth considering. It looks like the lowest cross-validation error occurs at 6: 38,315
 
 
 Looking at cross validation plot of Mean Squared Error by # of Components.
@@ -142,3 +154,33 @@ Stable after 3 components.
 
 
 The questions that arise are whether the performance would be consistent on the testing data, and whether the categorical variables (some of the factors) would be worth putting into the final model.
+
+```{r}
+pls.pred = predict(pls.fit, test, ncomp = 6)
+
+mean((pls.pred - test$SalePrice)^2)
+```
+The prediction is off by an average of $31,407
+
+
+Lets see what we get from other components
+
+Graphing:
+```{r}
+for (i in 1:33){
+  y[i] = mean((predict(pls.fit, test, ncomp = i) - test$SalePrice)^2)
+}
+x = seq(1,33)
+
+df = data.frame(x = x, y = y)
+ggplot(data = df, aes(x = x, y = y)) + 
+  geom_line() + 
+  geom_point() + 
+  labs(title = "MSE by Components", x = "# of Components", y = "MSE")
+```
+5 components might be a little better here. 
+
+```{r}
+mean((predict(pls.fit, test, ncomp = 5) - test$SalePrice)^2)
+```
+
