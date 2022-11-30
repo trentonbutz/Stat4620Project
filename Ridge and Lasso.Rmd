@@ -31,10 +31,6 @@ for (i in 1:length(names(test))) {
   }
 }
 
-# matching column names
-colnames(test)[which(names(test) == "X1stFlrSF")] <- "1stFlrSF"
-colnames(test)[which(names(test) == "X2ndFlrSF")] <- "2ndFlrSF"
-colnames(test)[which(names(test) == "X3SsnPorch")] <- "3SsnPorch"
 
 # splitting up training and test data
 # x variables creating dummy variables 
@@ -75,7 +71,7 @@ fit.ridge = glmnet(x_train,y_train,alpha=0,lambda=lambda.cv)
 pred.ridge = predict(fit.ridge,newx=x_test)
 error = mean((y_test-pred.ridge)^2)
 error
-# 755,664,852
+# 736,281,773
 
 # fit.ridge$beta
 ```
@@ -95,9 +91,11 @@ fit.lasso = glmnet(x_train,y_train,alpha=1,lambda=lambda.cv)
 pred.lasso = predict(fit.lasso,newx=x_test)
 error = mean((y_test-pred.lasso)^2)
 error
-# 952,059,317
+# 743,357,226
+
+coef(fit.lasso)
 
 sum(fit.lasso$beta != 0)
-# only 28 predictors 
+# 76 predictors 
 ```
 I looked at Ridge and LASSO and to me it seems like LASSO would be better and good for us to use just based on the fact that it gets it down to 28 variables out of the 241 there are if you include all the combinations of factor variables. I also ran 2 for loops to get rid of all factor variables not included in both design matrices because i assumed that specific categorical value would not be important if it doesn't even show up in a full set of data.
