@@ -1,0 +1,249 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+imports
+```{r}
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(GGally)
+library(MASS)
+library(car)
+```
+
+removing bad data
+```{r}
+test <- read_csv("C:/Users/chris/OneDrive/Desktop/Stat 4620/Ames/test_new.csv",show_col_types = FALSE)
+train <- read_csv("C:/Users/chris/OneDrive/Desktop/Stat 4620/Ames/train.csv",show_col_types = FALSE)
+
+for (i in 1:length(names(train))) {
+  if(class(train[[i]]) == "character") {
+    train[[i]] <- train[[i]] %>% replace_na("NoNe")
+  }
+  else #if (class(train[[i]]) == "numeric")
+    {
+    train[[i]] <- train[[i]] %>% replace_na(0)
+  }
+}
+
+for (i in 1:length(names(test))) {
+  if(class(test[[i]]) == "character") {
+    test[[i]] <- test[[i]] %>% replace_na("NoNe")
+  }
+  else #if (class(test[[i]]) == "numeric")
+    {
+    test[[i]] <- test[[i]] %>% replace_na(0)
+  }
+}
+```
+
+columns names dont line up between train and test for 1stFlrSF, 2ndFlrSF,3SsnPorch
+```{r}
+colnames(test)
+```
+```{r}
+colnames(train)
+```
+
+renaming test columns to match train
+```{r}
+colnames(test)[which(names(test) == "X1stFlrSF")] <- "1stFlrSF"
+colnames(test)[which(names(test) == "X2ndFlrSF")] <- "2ndFlrSF"
+colnames(test)[which(names(test) == "X3SsnPorch")] <- "3SsnPorch"
+```
+
+DATA EXPLORATION
+
+```{r}
+boxplot(SalePrice~Neighborhood,data=train,las=2)
+```
+StoneBr,NridgeHt,Ames all have means higher than most: could make a binary factor for one of these neighborhoods or not
+
+```{r}
+boxplot(SalePrice~OverallCond,data=train,las=2)
+```
+OverallCond seems misleading
+
+```{r}
+boxplot(SalePrice~ MoSold ,data=train,las=2)
+```
+notes: seems lots of factor variables could be reduced to excellent(highest) or not
+OverallQual > OverallCond
+
+
+MAIN WORK
+
+using info from messing with vif below to manually pick a subset of 'good' predictors
+```{r}
+attributes <- c('LotArea', 'OverallQual', 'TotalBsmtSF','1stFlrSF', '2ndFlrSF', 'GarageArea','SalePrice', 'MSZoning')
+
+train.reduced <- dplyr::select(train, all_of(attributes))
+test.reduced <- dplyr::select(test, all_of(attributes))
+```
+
+splitting data
+```{r}
+x_train=model.matrix(SalePrice ~.,train.reduced)[,-1]
+y_train=train.reduced$SalePrice
+x_test=model.matrix(SalePrice ~.,test.reduced)[,-1]
+y_test=test.reduced$SalePrice
+```
+
+predictions
+```{r}
+reduce.model <- lm(SalePrice~.,data=train.reduced)
+#summary(reduce.model)
+
+pred.reduce <- predict(reduce.model, newdata=test.reduced)
+mean((y_test-pred.reduce)^2)
+```
+
+```{r}
+plot(pred.reduce, y_test,xlab = "Predicted Values", ylab = "Observed Values")
+abline(a = 0, b = 1, col = "red", lwd = 2)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+REST OF FILE IS KINDA BS
+TRIED USING VIF FOR MULTICOLLINEARITY
+DIDNT REALLY WORK WELL
+
+
+intial model with everything as baseline
+```{r}
+full.model <- lm(SalePrice~.,data=train)
+#summary(full.model)
+```
+result:
+Residual standard error: 22580 on 1205 degrees of freedom
+Multiple R-squared:  0.9332,	Adjusted R-squared:  0.9192 
+F-statistic: 66.33 on 254 and 1205 DF,  p-value: < 2.2e-16
+
+predicting test data with full model
+```{r}
+pred.full <- predict(full.model,newdata = test)
+mean(( test$SalePrice -pred.full)^2)
+```
+
+
+
+
+separating numeric from cate vars
+```{r}
+numeric_cols <- unlist(lapply(train, is.numeric))
+
+numer_data <- train[,numeric_cols]
+numer_data0 <- numer_data[c(1:20,38)]
+numer_data1 <- numer_data[21:38]
+
+temp <- train[,!numeric_cols]
+cate_data <- cbind(temp,train[,"SalePrice"])
+cate_data0 <- cate_data[c(1:22,44)]
+cate_data1 <- cate_data[23:44]
+```
+
+Vars with high correlation: OverallQual, TotalBsmtSF, 1stFlrSF, TotRmsAbvGrd, FullBath, GrLivArea, GarageCars, GarageArea
+Vars from numeric step function: 2ndFlrSF
+Vars from cate step function: RoofMatl
+
+Not useful: PoolQC, Alley, Fence?
+
+
+Correlation of numerical vars (split for smaller output)
+```{r}
+cor(numer_data0)
+```
+
+```{r}
+cor(numer_data1)
+```
+
+
+
+```{r}
+num.model <-lm(SalePrice~.,data=numer_data)
+#summary(num.model)
+```
+
+got lucky, no alias in numer_data1
+```{r}
+num.model1 <- lm(SalePrice ~.,data = numer_data1)
+vif(num.model1)
+```
+
+checking alias before using VIF on full
+```{r}
+alias(lm(SalePrice ~.,data = train))
+```
+
+
+
+removing alias after checking full train set
+
+```{r}
+new.train <-dplyr::select(train, -c('Exterior2nd', 'BsmtCond', 'BsmtFinType1', 'BsmtFinSF1', 'BsmtFinSF2', 'BsmtUnfSF', '1stFlrSF', '2ndFlrSF', 'LowQualFinSF','GarageCond', 'GarageQual', 'GarageFinish'))
+
+new.model <- lm(SalePrice~.,data=new.train)
+#summary(new.model)
+vif(new.model)
+```
+
+Vars with high VIF (using VIF > 5 as cutoff)
+MSZoning
+Neighborhood
+RoofStyle
+MasVnrType
+Fireplaces
+GarageCars
+PoolQC
+
+
+kept running vif and removing more vars than listed above
+```{r}
+new2.train <- dplyr::select(new.train, -c('MSZoning','Neighborhood','RoofStyle','MasVnrType','Fireplaces','GarageCars','PoolQC','GarageYrBlt','BsmtExposure','MiscFeature','MSSubClass','BsmtFinType2','SaleCondition','GarageType','HouseStyle','Exterior1st','Foundation','TotRmsAbvGrd','BsmtQual','Id','ExterQual' ))
+new2.model <- lm(SalePrice~.,data=new2.train)
+summary(new2.model)
+#vif(new2.model)
+```
+result:
+Residual standard error: 27160 on 1345 degrees of freedom
+Multiple R-squared:  0.8922,	Adjusted R-squared:  0.8831 
+F-statistic: 97.69 on 114 and 1345 DF,  p-value: < 2.2e-16
+
+```{r}
+pred.new2 <- predict(new2.model,newdata = test)
+mean(( test$SalePrice - pred.new2)^2)
+```
+
+
+
+
+
+stepwiseAIC for model selection (PERFORMED BEFORE TRYING VIF, file is kinda out of order)
+```{r}
+stepNum.model <- stepAIC(num.model, direction ="both",trace=FALSE)
+#summary(stepNum.model)
+```
+
+```{r}
+cate.model <- lm(SalePrice~.,data= cate_data)
+vif(cate.model)
+stepCate.model <- stepAIC(cate.model, direction = "both",trace = FALSE)
+#summary(stepCate.model)
+```
+
