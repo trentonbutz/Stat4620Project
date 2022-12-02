@@ -13,6 +13,7 @@ library(GGally)
 library(MASS)
 library(pls)
 library(ggplot2)
+library(scales)
 ```
 
 Reading in data
@@ -150,17 +151,22 @@ Looking at cross validation plot of Mean Squared Error by # of Components.
 ```{r}
 validationplot(pls.fit, val.type = "MSEP")
 ```
-Stable after 3 components.
 
-
-The questions that arise are whether the performance would be consistent on the testing data, and whether the categorical variables (some of the factors) would be worth putting into the final model.
+Lets do prediction with the 6 component model.
 
 ```{r}
 pls.pred = predict(pls.fit, test, ncomp = 6)
 
 mean((pls.pred - test$SalePrice)^2)
+
+sqrt(mean((pls.pred - test$SalePrice)^2))
 ```
 The prediction is off by an average of $31,407
+
+Comparing 31k against the distribution of 'SalePrice' shown below, it's not too bad of a model.
+```{r}
+ggplot(data = test, aes(x=SalePrice)) + geom_boxplot()
+```
 
 
 Lets see what we get from other components
@@ -183,4 +189,82 @@ ggplot(data = df, aes(x = x, y = y)) +
 ```{r}
 mean((predict(pls.fit, test, ncomp = 5) - test$SalePrice)^2)
 ```
+Slightly better MSE, with an average sale price deviation of $31,250
+
+```{r}
+df = data.frame(y = test$SalePrice, x = pls.pred[,1,1])
+
+ggplot(data = df, aes(x = x, y = y)) + geom_point() + 
+  labs(x = "Predicted Sale Price", y = "Actual Sale Price") + 
+  geom_abline(slope = 1)
+```
+There appears to be somewhat of a non-linear relationship at play here. Maybe if we tried to predict the log of the sale price, we could get better results. Besides that, the model is doing a pretty good job.
+
+
+PLS model on the log of Sale Price.
+```{r}
+set.seed(196)
+log.pls.fit = plsr(log(SalePrice) ~., data = train %>%
+                dplyr::select(-BsmtFinSF1,-X1stFlrSF, -GarageCars, -GarageYrBlt) %>%
+                select_if(is.numeric),
+              scale = TRUE, validation = "CV")
+summary(log.pls.fit)
+```
+It looks like the new model is doing a better job of explaining the variance in the response variable. Within 5 components, we are at 86.4%. It looks like the cross validation is telling us to pick 4 components here. Which is more concise than before. 
+
+```{r}
+#Taking the exponentiated predictions as the new prediction matrix
+log.pls.pred = exp(predict(log.pls.fit, test, ncomp = 4))
+
+mean((log.pls.pred - test$SalePrice)^2)
+
+sqrt(mean((log.pls.pred - test$SalePrice)^2))
+```
+It appears that the MSE is slightly worse than before. Let's look at the data.
+
+
+```{r}
+log.df = data.frame(y = test$SalePrice, x = log.pls.pred[,1,1])
+
+ggplot(data = log.df, aes(x = x, y = y)) + geom_point() + 
+  labs(x = "Predicted Sale Price", y = "Actual Sale Price") + 
+  geom_abline(slope = 1)
+```
+This new relationship appears to be less patterned than before. Although the model appears to still underestimate the more expensive houses. Overall, this looks better, if we don't weigh the effects of the outlier too heavily. 
+
+
+What if we removed the outlier?
+```{r}
+test.removed = test[-1082,]
+
+log.pls.pred.out.removed = exp(predict(log.pls.fit, test.removed, ncomp = 4))
+
+mean((log.pls.pred.out.removed - test.removed$SalePrice)^2)
+
+sqrt(mean((log.pls.pred.out.removed - test.removed$SalePrice)^2))
+```
+We see that we get a new MSE of 644 million! Which is the best result we have seen up until this point, but we had to remove something to achieve it.
+
+
+Plotting the new graph with the removed point.
+```{r}
+log.df.removed = data.frame(y = test.removed$SalePrice, x = log.pls.pred.out.removed[,1,1])
+
+ggplot(data = log.df.removed, aes(x = x, y = y)) + geom_point() + 
+  labs(x = "Predicted Sale Price", y = "Actual Sale Price", title = "Partial Least Squares on Log of Sale Price Model") + 
+  geom_abline(slope = 1)
+```
+
+Residual plot
+```{r}
+resids = test.removed$SalePrice - log.pls.pred.out.removed[,1,1]
+
+resids.df = data.frame(x = log.pls.pred.out.removed[,1,1], y = resids)
+
+ggplot(data = resids.df, aes(x = log.pls.pred.out.removed[,1,1], y = resids)) + 
+  geom_point() + labs(x = "Predicted Sale Price", y = "Residuals", title = "Partial Least Squares on Log of Sale Price Model") +
+  geom_abline(slope = 0) + scale_x_continuous(labels = comma) + scale_y_continuous(labels = comma)
+```
+
+
 
