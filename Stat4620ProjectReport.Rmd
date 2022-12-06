@@ -1,0 +1,122 @@
+---
+title: "Using Statistical Learning to Predict Sale Price of Homes in Ames, Iowa"
+author: "AJ Turner, Chris Holman, Patrick Tiernan, Nick Brizzi, Trenton Butz"
+date: '2022-12-06'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+```
+
+## Section I: Exploratory Data Analysis
+
+Before we are able to perform Exploratory Data Analysis and investigate the Ames Housing Data, we must first load in the training and testing data as well as any packages that will be required in our analysis. 
+
+```{r}
+# If you have not installed any of the below packages, please run 
+# install.packages('package') in your R console, replacing "package"
+# with the name of the package which you have not installed. 
+library(tidyverse)
+library(readr)
+library(ggplot2)
+```
+
+```{r}
+# Change the file paths in the following code to match the locations in 
+# which you've stored the training and testing datasets, respectively.
+train <- read_csv("~/OSU Classes/Stat 4620/Ames/Ames/train.csv")
+test <- read_csv("~/OSU Classes/Stat 4620/Ames/Ames/test_new.csv")
+```
+
+First, let's take a look at the first five rows of the training dataset to get a sense of its structure.
+
+```{r}
+head(train, n = 5)
+```
+
+From this, we can tell that there are 81 variables in the training data. Of these, there appears to be some mixture of quantitative variables and categorical variables, which will inform our choice of statistical learning techniques. We should also note that the quantitative variables appear to exist on rather different scales, which means that we may which to choose techniques that perform variable standardization (or perform this standardization manually) to ensure that the predictor variables all have equitable contributions in our models. 
+
+As we're examining potential problems with our dataset, we should consider the impact that missing data will have on the execution of our model. Many R functions automatically exclude missing data from our analysis. This may be appropriate if there is not a lot of missing data, but if NAs are a more widespread problem, we may choose to interpolate specific values instead. 
+
+```{r}
+head(sapply(train, function(x) sum(is.na(x))), n = 10)
+```
+
+From this output, we see that  there are 259 missing values in the `LotFrontage` variable, as well as 1,369 missing values in the `Alley` variable - and that's just the missing values in the first ten columns of the training data set. Since we only have approximately 1,400 observations in the first place, we certainly cannot exclude all instances which have an NA in any column. A better method will be interpolation, which will look slightly different for categorical variables than for quantitative variables. For character variables, we will choose to set NA instances to "None" in order to keep the new values consistent with the existing values within the same column. For quantitative variables, we have chosen to set missing values to 0. It was also possible to use the column mean, but without more expertise with this kind of data, it is difficult to determine which method is better, if any.
+
+```{r}
+for (i in 1:length(names(train))) {
+  if(class(train[[i]]) == "character") {
+    train[[i]] <- train[[i]] %>% replace_na("None")
+  }
+  else {
+    train[[i]] <- train[[i]] %>% replace_na(0)
+  }
+}
+
+for (i in 1:length(names(test))) {
+  if(class(test[[i]]) == "character") {
+    test[[i]] <- test[[i]] %>% replace_na("None")
+  }
+  else {
+    test[[i]] <- test[[i]] %>% replace_na(0)
+  }
+}
+```
+
+Missing data is not the only problem that we are facing with this data set. It would be smart to check the columns in each data set more closely to make sure that all of the columns are truly equal between the training and the testing data. This will help make sure that no errors arise when we get to the prediction stage of our analysis.  
+
+
+```{r}
+for (i in 1:length(train))
+  if (colnames(train)[i] != colnames(test)[i]){
+    print(colnames(train)[i])
+    print(colnames(test)[i]) 
+  }
+```
+
+In fact, there are three variables whose names differ between the training and the testing data. The pattern appears to be that in the testing data, variables whose names start with a number have been given a leading X, while the same is not true for the training data. This could be due to R automatically "fixing" the column names. Either way, we should fix it. 
+
+```{r}
+colnames(test)[which(names(test) == "X1stFlrSF")] <- "1stFlrSF"
+colnames(test)[which(names(test) == "X2ndFlrSF")] <- "2ndFlrSF"
+colnames(test)[which(names(test) == "X3SsnPorch")] <- "3SsnPorch"
+```
+
+One way to begin searching for collinearity among the predictor variables is to find the variables which are named similarly and check if they are collinear. For instance, one can find a handful of variables in the training data set whose named end in the string `SF`. This indicates "square footage", or the length of a region in feet multiplied by its width. It makes sense that there are multiple variables indicating square footage because it might be important to find the square footage of each room in a given house. Let's take a look at a pairs plot involving several of these variables. 
+
+```{r}
+pairs(data.frame(train$TotalBsmtSF, train$`1stFlrSF`, train$`2ndFlrSF`, train$GarageArea), main = "Correlation of Variables related to Area")
+```
+
+It turns out that there is a significant amount of collinearity between most of these variables, as we expected. For example, Total Basement Square Footage appears to have a strong positive correlation with First Floor Square Footage, which makes sense intuitively. The size of the basement appears to be more moderately correlated with the area of the garage, which also seems reasonable given that a homeowner's decision to fit one more car in their garage has less of a direct impact on how large of a basement they are interested in. 
+
+Several variables which include the word "Garage" are similarly collinear. The following small correlation matrix shows that the variable that encodes the area of a garage has a strong positive correlation with the variable that encodes the number of cars that the garage is designed to contain. 
+
+```{r}
+cor(data.frame(train$GarageCars, train$GarageArea))
+```
+
+
+We can take a similar approach to make an early determination of which variables are likely to be important in predicting Sale Price. Based on our previous knowledge, we anticipate that the size of the house, as well as the neighborhood that the house is in, will be most effective at predicting the sale price of that house. We can check the first assumption with another pairs plot, and we can check the second assumption with a boxplot, since `Neighborhood` is a categorical variable. 
+
+```{r}
+par(mfrow = c(2,1))
+
+pairs(data.frame(train$SalePrice, train$TotalBsmtSF, train$`1stFlrSF`, train$`2ndFlrSF`), main = "Correlation of Sale Price with Square Footage Predictors")
+
+boxplot(train$SalePrice ~ train$Neighborhood, main = "Correlation of Sale Price with Neighborhood", xlab = "Name of Neighborhood", ylab = "Sale Price ($)")
+```
+
+In the first plot, we can look more closely at the first column to gauge the correlation of each of the three chosen predictors on Sale Price. All three predictors seem to be positively correlated with the dependent variable, and all three are at least moderately correlated with `SalePrice`. This means that our intuition that the size of a house is predictive of the price for which it will be sold was correct. Looking more closely at the second plot, there is a fair amount of noise, but some neighborhoods clearly have higher median Sale Prices than others. When it comes to interpreting the results of our model, we can look more closely at which neighborhoods are the most expensive to live in, on average. 
+
+### Chris: include key figures, discuss modeling approaches, 
+### review existing EDA and add other parts as you see fit.
+
+
+
+## Section II: Model Analysis
+
+
+
