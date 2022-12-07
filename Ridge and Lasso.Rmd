@@ -10,9 +10,10 @@ library(glmnet)
 library(ISLR)
 library(tidyverse)
 library(dplyr)
+library(ggplot2)
+library(GGally)
 train <- read.csv("/Users/patricktiernan/Downloads/Ames/train.csv")
 test <- read.csv("/Users/patricktiernan/Downloads/Ames/test_new.csv")
-
 for (i in 1:length(names(train))) {
   if(class(train[[i]]) == "character") {
     train[[i]] <- train[[i]] %>% replace_na("None")
@@ -21,7 +22,6 @@ for (i in 1:length(names(train))) {
     train[[i]] <- train[[i]] %>% replace_na(0)
   }
 }
-
 for (i in 1:length(names(test))) {
   if(class(test[[i]]) == "character") {
     test[[i]] <- test[[i]] %>% replace_na("None")
@@ -30,15 +30,12 @@ for (i in 1:length(names(test))) {
     test[[i]] <- test[[i]] %>% replace_na(0)
   }
 }
-
-
 # splitting up training and test data
 # x variables creating dummy variables 
 x_train=model.matrix(SalePrice ~.,train)[,-1]
 y_train=train$SalePrice
 x_test=model.matrix(SalePrice ~.,test)[,-1]
 y_test=test$SalePrice
-
 # find variables not in test but in train
 not_in_test <- c()
 for (i in 1:length(colnames(x_train))){
@@ -46,7 +43,6 @@ for (i in 1:length(colnames(x_train))){
     not_in_test <- append(not_in_test, i)
   }
 }
-
 # find the variables not in train but in test
 not_in_train <- c()
 for (i in 1:length(colnames(x_test))){
@@ -54,26 +50,23 @@ for (i in 1:length(colnames(x_test))){
     not_in_train <- append(not_in_train, i)
   }
 }
-
 # taking out columns that are not in test and training data
 x_train <- x_train[,-not_in_test]
 x_test <- x_test[, -not_in_train]
-
-
-
-
 ridge.cv = cv.glmnet(x_train,y_train,alpha=0)
 plot(ridge.cv)  #plots on log-lambda scale.  The '19' at the top refers to effective df.
 lambda.cv = ridge.cv$lambda.min  # the minimizing lambda
 lambda.cv
-
 fit.ridge = glmnet(x_train,y_train,alpha=0,lambda=lambda.cv)
 pred.ridge = predict(fit.ridge,newx=x_test)
 error = mean((y_test-pred.ridge)^2)
 error
 # 736,281,773
-
 # fit.ridge$beta
+
+xt <- data.frame(x_train)
+
+ggpairs(xt)
 ```
 
 
@@ -85,15 +78,34 @@ plot(lasso.cv)  #plots on log-lambda scale.  The '19' at the top refers to effec
 plot(lasso.cv$lambda,lasso.cv$cvm,xlim=c(0,50))  # we can always plot things manually if we like
 lambda.cv = lasso.cv$lambda.min  # the minimizing lambda
 lambda.cv
-
 fit.lasso = glmnet(x_train,y_train,alpha=1,lambda=lambda.cv)
-
 pred.lasso = predict(fit.lasso,newx=x_test)
-error = mean((y_test-pred.lasso)^2)
+errors = (y_test-pred.lasso)^2
+errors2 = errors[errors != max(errors)]
+error = mean(errors2)
 error
-# 743,357,226
 
+plot(pred.lasso, y_test)
+
+pred_v_real <- data.frame(x = pred.lasso, y = y_test)
+highlight_df <- pred_v_real %>% 
+             filter(pred.lasso > 550000)
+
+
+pred_v_real %>% ggplot(aes(x=pred.lasso, y=y_test)) +
+    geom_point() +
+    geom_point(data = highlight_df, aes(x=s0, y=y), color = 'red') +
+    geom_smooth(method=lm) + 
+  xlab('Predicted Sale Price') +
+  ylab('Actual Sale Price')
+
+highlight_df$s0
+
+# 743,357,226
 coef(fit.lasso)
+
+
+pred.lasso
 
 sum(fit.lasso$beta != 0)
 # 76 predictors 
