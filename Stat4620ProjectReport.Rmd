@@ -43,7 +43,7 @@ As we're examining potential problems with our dataset, we should consider the i
 head(sapply(train, function(x) sum(is.na(x))), n = 10)
 ```
 
-From this output, we see that  there are 259 missing values in the `LotFrontage` variable, as well as 1,369 missing values in the `Alley` variable - and that's just the missing values in the first ten columns of the training data set. Since we only have approximately 1,400 observations in the first place, we certainly cannot exclude all instances which have an NA in any column. A better method will be interpolation, which will look slightly different for categorical variables than for quantitative variables. For character variables, we will choose to set NA instances to "None" in order to keep the new values consistent with the existing values within the same column. For quantitative variables, we have chosen to set missing values to 0. It was also possible to use the column mean, but without more expertise with this kind of data, it is difficult to determine which method is better, if any.
+From this output, we see that  there are 259 missing values in the `LotFrontage` variable, as well as 1,369 missing values in the `Alley` variable - and that's just the missing values in the first ten columns of the training data set. Since we only have approximately 1,400 observations in the first place, we certainly cannot exclude all instances which have an NA in any column. A better method will be interpolation, which will look slightly different for categorical variables than for quantitative variables. For character variables, we will choose to set NA instances to "None" in order to keep the new values consistent with the existing values within the same column. For quantitative variables, we have chosen to set missing values to 0. It is also possible to use the column mean, but take the variable LotFrontage as an example: an NA value may attempt to convey that the property is an apartment complex or some similar building with zero distance to the street, so replacing NA with the column mean would be inaccurate. 
 
 ```{r}
 for (i in 1:length(names(train))) {
@@ -65,7 +65,7 @@ for (i in 1:length(names(test))) {
 }
 ```
 
-Missing data is not the only problem that we are facing with this data set. It would be smart to check the columns in each data set more closely to make sure that all of the columns are truly equal between the training and the testing data. This will help make sure that no errors arise when we get to the prediction stage of our analysis.  
+Missing data is not the only problem that we are facing with our data. It would be smart to check the columns in each data set more closely to make sure that all of the columns are truly equal between the training and the testing data. This will help make sure that no errors arise when we get to the prediction stage of our analysis.  
 
 
 ```{r}
@@ -84,7 +84,7 @@ colnames(test)[which(names(test) == "X2ndFlrSF")] <- "2ndFlrSF"
 colnames(test)[which(names(test) == "X3SsnPorch")] <- "3SsnPorch"
 ```
 
-One way to begin searching for collinearity among the predictor variables is to find the variables which are named similarly and check if they are collinear. For instance, one can find a handful of variables in the training data set whose named end in the string `SF`. This indicates "square footage", or the length of a region in feet multiplied by its width. It makes sense that there are multiple variables indicating square footage because it might be important to find the square footage of each room in a given house. Let's take a look at a pairs plot involving several of these variables. 
+One way to begin searching for collinearity among the predictor variables is to find the variables which are named similarly and check if they are collinear. For instance, one can find a handful of variables in the training data set whose named end in the string `SF`. This indicates "square footage", or the length of a region in feet multiplied by its width, in feet. It makes sense that there are multiple variables indicating square footage because it might be important to find the square footage of each room in a given house. Let's take a look at a pairs plot involving several of these variables. 
 
 ```{r}
 pairs(data.frame(train$TotalBsmtSF, train$`1stFlrSF`, train$`2ndFlrSF`, train$GarageArea), main = "Correlation of Variables related to Area")
@@ -99,17 +99,29 @@ cor(data.frame(train$GarageCars, train$GarageArea))
 ```
 
 
-We can take a similar approach to make an early determination of which variables are likely to be important in predicting Sale Price. Based on our previous knowledge, we anticipate that the size of the house, as well as the neighborhood that the house is in, will be most effective at predicting the sale price of that house. We can check the first assumption with another pairs plot, and we can check the second assumption with a boxplot, since `Neighborhood` is a categorical variable. 
+We can take a similar approach to make an early determination of which variables are likely to be important in predicting Sale Price. Based on our previous knowledge, we anticipate that the size of the house, as well as the neighborhood that the house is in, will be most effective at predicting the sale price of that house. We can check the first assumption with another pairs plot, and we can check the second assumption with a boxplot, since `Neighborhood` is a categorical variable. Since there are many neighborhoods in the data and we don't want to end up with a crowded plot, we will only plot neighborhoods that occur in the training data more than 50 times.  
 
 ```{r}
 par(mfrow = c(2,1))
 
 pairs(data.frame(train$SalePrice, train$TotalBsmtSF, train$`1stFlrSF`, train$`2ndFlrSF`), main = "Correlation of Sale Price with Square Footage Predictors")
 
-boxplot(train$SalePrice ~ train$Neighborhood, main = "Correlation of Sale Price with Neighborhood", xlab = "Name of Neighborhood", ylab = "Sale Price ($)")
+neighborhoods <- train %>% 
+  group_by(Neighborhood) %>% 
+  count(Neighborhood) %>% 
+  filter(n > 50) %>% 
+  ungroup()
+
+train %>% 
+  filter(Neighborhood %in% neighborhoods$Neighborhood) %>% 
+  ggplot() + 
+    geom_boxplot(aes(x = Neighborhood, y = SalePrice)) + 
+    labs(title = "Effect of Neighborhood on Sale Price")
+
+#boxplot(train$SalePrice ~ train$Neighborhood, main = "Correlation of Sale Price with Neighborhood", xlab = "Name of Neighborhood", ylab = "Sale Price ($)")
 ```
 
-In the first plot, we can look more closely at the first column to gauge the correlation of each of the three chosen predictors on Sale Price. All three predictors seem to be positively correlated with the dependent variable, and all three are at least moderately correlated with `SalePrice`. This means that our intuition that the size of a house is predictive of the price for which it will be sold was correct. Looking more closely at the second plot, there is a fair amount of noise, but some neighborhoods clearly have higher median Sale Prices than others. When it comes to interpreting the results of our model, we can look more closely at which neighborhoods are the most expensive to live in, on average. 
+In the first plot, we can look more closely at the first column to gauge the correlation of each of the three chosen predictors on Sale Price. All three predictors seem to be positively correlated with the dependent variable, and all three are at least moderately correlated with `SalePrice`. This means that our intuition that the size of a house is predictive of the price for which it will be sold is correct. Looking more closely at the second plot, it appears that the neighborhood encoded "NRidgHt" has the highest median SalePrice at nearly two times that of many other prevalent neighborhoods. When it comes to interpreting the results of our model, we will likely see that a house in Northridge Heights is predicted to sell for a lot more money than another house, all else equal. 
 
 ### Chris: include key figures, discuss modeling approaches, 
 ### review existing EDA and add other parts as you see fit.
@@ -117,6 +129,4 @@ In the first plot, we can look more closely at the first column to gauge the cor
 
 
 ## Section II: Model Analysis
-
-
 
