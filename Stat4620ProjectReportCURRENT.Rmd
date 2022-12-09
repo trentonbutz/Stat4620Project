@@ -20,6 +20,7 @@ Before we are able to perform Exploratory Data Analysis and investigate the Ames
 library(tidyverse)
 library(readr)
 library(ggplot2)
+library(glmnet)
 ```
 
 ```{r}
@@ -27,6 +28,11 @@ library(ggplot2)
 # which you've stored the training and testing datasets, respectively.
 test <- read_csv("C:/Users/chris/OneDrive/Desktop/Stat 4620/Ames/test_new.csv",show_col_types = FALSE)
 train <- read_csv("C:/Users/chris/OneDrive/Desktop/Stat 4620/Ames/train.csv",show_col_types = FALSE)
+
+train <- read_csv("train.csv")
+test<- read_csv("test_new.csv")
+
+
 ```
 
 First, let's take a look at the first five rows of the training dataset to get a sense of its structure.
@@ -150,3 +156,63 @@ Now while all of these variables show moderate to strong relationships with the 
 
 
 ## Section II: Model Analysis
+
+### Lasso Model
+
+We decided to try a lasso model because it is capable of using both quantitative and categorical data. Lasso regression uses shrinkage by adding a penalty term to the cost function. This causes some of the coefficients in the model to be exactly zero, eliminating those features from the model. This is useful because it can reduce the complexity of the model and prevent overfitting.
+
+First, we had to set up the data to be used in our Lasso model. We ran into an issue where the train set had a few colums that were missing from the test set and vice versa. To solve this, we dropped the columns in each set that were missing in the other.
+
+```{r}
+# Set train data
+train_y = train$SalePrice
+train_x = model.matrix(SalePrice~., train)[, -1]
+
+# Set test data
+test_y = test$SalePrice
+test_x = model.matrix(SalePrice~., test)[, -1]
+
+# Check for missing columns in each and fix
+missing_test = setdiff(colnames(train_x),colnames(test_x))
+missing_train = setdiff(colnames(test_x),colnames(train_x))
+train_x = train_x[,!colnames(train_x) %in% setdiff(colnames(train_x), colnames(test_x))]
+test_x = test_x[,!colnames(test_x) %in% setdiff(colnames(test_x), colnames(train_x))]
+```
+
+Next, we used cross validation to determine the ideal value of lambda for our Lasso model. The minimizing lambda value ended up being 1149.997.
+
+```{r}
+set.seed(101)
+lasso_cv = cv.glmnet(train_x,train_y,alpha=1)
+
+plot(lasso_cv)
+plot(lasso_cv$lambda,lasso_cv$cvm,xlim=c(0,100000))
+
+lambda_cv = lasso_cv$lambda.min 
+lambda_cv
+```
+
+We used this value of lambda to fit the Lasso model below.
+
+```{r}
+fit_lasso = glmnet(train_x,train_y,alpha=1, lambda=lambda_cv)
+coef(fit_lasso)
+sum(fit_lasso$beta != 0)
+```
+
+Another benefit of using a Lasso model is that it can be easily interpreted. Since the model completely zeroes out features that aren't significant in making predictions, we are left with only those features that do significantly impact our predictions. Our model ended up with a total of 76 significant features. 
+
+##Maybe pick out some important features to write about
+
+```{r}
+pred_lasso = predict(fit_lasso,newx=test_x)
+mean((test_y-pred_lasso)^2)
+```
+
+```{r}
+plot(pred_lasso, test_y, xlab="Predicted Sale Price", ylab="Actual Sale Price")
+```
+
+
+
+
