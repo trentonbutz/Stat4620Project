@@ -161,9 +161,9 @@ Now while all of these variables show moderate to strong relationships with the 
 
 We decided to try a lasso model because it is capable of using both quantitative and categorical data. Lasso regression uses shrinkage by adding a penalty term to the cost function. This causes some of the coefficients in the model to be exactly zero, eliminating those features from the model. This is useful because it can reduce the complexity of the model and prevent overfitting.
 
-First, we had to set up the data to be used in our Lasso model. We ran into an issue where the train set had a few colums that were missing from the test set and vice versa. To solve this, we dropped the columns in each set that were missing in the other.
+First, we had to set up the data to be used in our Lasso model. We ran into an issue where the train set had a few colums that were missing from the test set and vice versa. To solve this, we dropped the columns in each set that were missing in the other. This solution was used due to some analysis on the variables not included in both the training and test data. Most of these entries were 'None' variables meaning that the information was simply not in the data set. An example of this is 'SaleTypeNone'. Other examples were ultra-specific category types, such as 'ElectricalMix' that would not be easily interpretable anyways. So, we decided the best course of action would be to simply eliminate these uncommon categorical variables.
 
-```{r}
+```{r,echo=FALSE, results=FALSE}
 # Set train data
 train_y = train$SalePrice
 train_x = model.matrix(SalePrice~., train)[, -1]
@@ -181,36 +181,60 @@ test_x = test_x[,!colnames(test_x) %in% setdiff(colnames(test_x), colnames(train
 
 Next, we used cross validation to determine the ideal value of lambda for our Lasso model. The minimizing lambda value ended up being 1149.997.
 
-```{r}
+```{r,echo=FALSE}
 set.seed(101)
 lasso_cv = cv.glmnet(train_x,train_y,alpha=1)
 
 plot(lasso_cv)
-plot(lasso_cv$lambda,lasso_cv$cvm,xlim=c(0,100000))
+plot(lasso_cv$lambda,lasso_cv$cvm,xlim=c(0,100000), xlab = expression(lambda), ylab = 'CV')
 
 lambda_cv = lasso_cv$lambda.min 
-lambda_cv
 ```
 
 We used this value of lambda to fit the Lasso model below.
 
-```{r}
+```{r, echo=FALSE}
 fit_lasso = glmnet(train_x,train_y,alpha=1, lambda=lambda_cv)
 coef(fit_lasso)
-sum(fit_lasso$beta != 0)
+nono_zero_coeff <- sum(fit_lasso$beta != 0)
+
 ```
 
-Another benefit of using a Lasso model is that it can be easily interpreted. Since the model completely zeroes out features that aren't significant in making predictions, we are left with only those features that do significantly impact our predictions. Our model ended up with a total of 76 significant features. 
+Another benefit of using a Lasso model is that it can be easily interpreted. Since the model completely zeroes out features that aren't significant in making predictions, we are left with only those features that significantly impact our predictions. Our model ended up with a total of 76 significant features. These selected features contain a fairly even mix of continuous and categorical variables. As expected, the continuous variables scaling the typical factors in home price are included, such as the overall quality, overall condition, and year built. These were the factors we expected to be impactful on the sale price. Furthermore, we attempted PLS with the thought that some of the categorical variables may be accounted for in these continuous ones. However, this proved to not be the case as certain categorical variables were impactful in this Lasso model. Some of these include certain neighborhoods, building types, and exterior finish types. This goes to show that there are truly many factors involved in modeling the price of the sale of a house and also shows that all this information is simply unable to be captured from a simply one to ten quality or condition rating.      
+  
+This produced a test MSE of 743,357,226. We did, however, notice on the plot that there appears to be one point that is an outlier. There is one point that has a squared error of 165,443,629,151 which is 105,709,376,321 greater than the second greatest squared error. The plot below displays this with the red point in the bottom right of the plot. If this outlier is taken out of the test data, the MSE drops to 629,456,623. This is a significant difference simply outlined by the removal of a single point. The data points appear to show a strong linear trend with an $R^2$ value of .8868. With the removal of the outlier, the $R^2$ value rises to .9065. Hence, the model explains about 90% of the variance in the test data with or without the outlier. This is a very strong correlation and, hence, we concluded this to be our best model.  
 
-##Maybe pick out some important features to write about
-
-```{r}
+```{r, echo=FALSE, results=FALSE}
 pred_lasso = predict(fit_lasso,newx=test_x)
 mean((test_y-pred_lasso)^2)
 ```
 
-```{r}
-plot(pred_lasso, test_y, xlab="Predicted Sale Price", ylab="Actual Sale Price")
+```{r,echo=FALSE}
+errors_w_outlier = (test_y-pred_lasso)^2
+mse_outliers <- mean(errors_w_outlier)
+errors_no_outlier = errors_w_outlier[errors_w_outlier != max(errors_w_outlier)]
+errors_no_outlier_mean = mean(errors_no_outlier)
+mse_nooutlier <- errors_no_outlier_mean
+
+pred_v_real <- data.frame(x = pred_lasso, y = test_y)
+highlight_df <- pred_v_real %>% 
+             filter(pred_lasso > 550000)
+no_outlier <- pred_v_real %>% 
+             filter(pred_lasso < 550000)
+
+pred_v_real %>% ggplot(aes(x=pred_lasso, y=test_y)) +
+    geom_point() +
+    geom_point(data = highlight_df, aes(x=s0, y=y), color = 'red') +
+    geom_smooth(method=lm) + 
+  xlab('Predicted Sale Price') +
+  ylab('Actual Sale Price')
+
+# find r^2 with outlier
+r2_outlier <- summary(lm(test_y ~ pred_lasso))
+
+# r^2 with no outlier
+r2_nooutlier <- summary(lm(y ~ s0, data = no_outlier))
+
 ```
 
 
