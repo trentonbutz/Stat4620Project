@@ -129,6 +129,7 @@ boxplot(SalePrice ~ BldgType, data=train, main = 'Building Type')
 boxplot(SalePrice ~ Exterior1st , data=train, main = 'Exterior covering on house')
 boxplot(SalePrice ~ KitchenQual, data=train, main = 'Kitchen Quality')
 ```
+
 Taking a look at more of the categorical predictors shows that there are definite relationships between them and the dependent variable, SalePrice. In the top two box plots, it is clear that both categorical predictors have a single category with a large majority of the more highly priced houses. Top left represents the houses proximity to various locations such as parks or railroads, while top right categorizes houses based on the type of building it is. Based on intuition and these plots, it is clear that these predictors show high potential for predictive power. Looking at the bottom two plots shows lots of variation between categories of the respective predictors. This is another sign that these predictors could be influential for our final model.
 
 
