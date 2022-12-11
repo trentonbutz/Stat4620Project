@@ -143,13 +143,13 @@ strong <- abs(cm) > 0.5 & abs(cm) < 1
 cm[strong]
 ```
 
-Once we've gotten a feel for the dataset and cleaned it up, its important to make sure we understand the variables. Above shows numerical variables with high correlation (above 0.6) with our dependent variable of Sale Price. The larger the magnitude of a variables correlation, the more predictive power it can add to the model. These are the predictors that we should take some time to understand because most likely they will be used in the final model. Below is a brief summary of what these predictors represent.
+Once we've gotten a feel for the dataset and cleaned it up, its important to make sure we understand the variables. Above shows numerical variables with high correlation (above 0.6) with our dependent variable of Sale Price. The larger the magnitude of a variable's correlation, the more predictive power it can add to the model. These are the predictors that we should take some time to understand because most likely they will be used in the final model. Below is a brief summary of what these predictors represent.
 
 * OverallQual: Overall Quality quantifies the houses overall material and finish of the house from 1-10  
 * TotalBsmtSF, 1stFlrSF & GrLivArea: Square footage of the entire basement, first floor, and all living area above ground, respectively 
 * YearBuilt & YearRemodAdd: The year that the house was built or remodeled, respectively
 * FullBath: Quantifies the number of full bathrooms above ground
-* TotRmsAbvGrd: Quantifies the number of rooms above ground in the house.
+* TotRmsAbvGrd: Quantifies the number of rooms above ground in the house
 * GarageCars & GarageArea: Shows the number of cars and Square Footage of the garage, respectively  
     
   
@@ -204,7 +204,7 @@ pls.fit = plsr(SalePrice ~., data = train %>%
 summary(pls.fit)
 ```
 
-The first 3 components explain 80.13% of the variation in Y, and it levels off after that. 4-6 would be the most that would be worth considering. It looks like the lowest cross-validation error occurs at 6: 38,315
+The first 3 components explain 80.13% of the variation in Y, and it levels off after that. 4-6 would be the most that would be worth considering. It looks like the lowest cross-validation error occurs at 6: 38,315.
 
 
 Looking at cross validation plot of Mean Squared Error by # of Components.
@@ -221,7 +221,7 @@ mean((pls.pred - test$SalePrice)^2)
 sqrt(mean((pls.pred - test$SalePrice)^2))
 ```
 
-The prediction is off by an average of $31,478
+The prediction is off by an average of $31,478.
 
 Comparing 31k against the distribution of `SalePrice` shown below, it's not too bad of a model.
 
@@ -241,7 +241,7 @@ mean((predict(pls.fit, test, ncomp = 5) - test$SalePrice)^2)
 mean((predict(pls.fit, test, ncomp = 6) - test$SalePrice)^2)
 ```
 
-Slightly better MSE, with an average sale price deviation of $31,250
+Slightly better MSE, with an average sale price deviation of $31,250.
 
 ```{r}
 df = data.frame(y = test$SalePrice, x = pls.pred[,1,1])
