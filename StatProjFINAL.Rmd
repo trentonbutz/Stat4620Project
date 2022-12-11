@@ -6,14 +6,14 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
 ```
 
 ## Section I: Exploratory Data Analysis
 
-Before we are able to perform Exploratory Data Analysis and investigate the Ames Housing Data, we must first load in the training and testing data as well as any packages that will be required in our analysis.
+Before we are able to perform Exploratory Data Analysis and investigate the Ames Housing Data, we must first load in the training and testing data as well as any packages that will be required in our analysis. Please note that all code after the first two chunks has been hidden in the report, but can be viewed in the RMD file attached to the project submission.
 
-```{r}
+```{r, echo = TRUE}
 # If you have not installed any of the below packages, please run 
 # install.packages('package') in your R console, replacing "package"
 # with the name of the package which you have not installed. 
@@ -24,11 +24,11 @@ library(glmnet)
 library(pls)
 ```
 
-```{r}
+```{r, echo = TRUE}
 # Change the file paths in the following code to match the locations in 
 # which you've stored the training and testing datasets, respectively.
-test <- read_csv("C:/Users/chris/OneDrive/Desktop/Stat 4620/Ames/test_new.csv",show_col_types = FALSE)
-train <- read_csv("C:/Users/chris/OneDrive/Desktop/Stat 4620/Ames/train.csv",show_col_types = FALSE)
+train <- read_csv("~/OSU Classes/Stat 4620/Ames/Ames/train.csv")
+test <- read_csv("~/OSU Classes/Stat 4620/Ames/Ames/test_new.csv")
 ```
 
 First, let's take a look at the first five rows of the training dataset to get a sense of its structure.
@@ -82,7 +82,6 @@ In fact, there are three variables whose names differ between the training and t
 colnames(train)[which(names(train) == "X1stFlrSF")] <- "1stFlrSF"
 colnames(train)[which(names(train) == "X2ndFlrSF")] <- "2ndFlrSF"
 colnames(train)[which(names(train) == "X3SsnPorch")] <- "3SsnPorch"
-
 colnames(test)[which(names(test) == "X1stFlrSF")] <- "1stFlrSF"
 colnames(test)[which(names(test) == "X2ndFlrSF")] <- "2ndFlrSF"
 colnames(test)[which(names(test) == "X3SsnPorch")] <- "3SsnPorch"
@@ -120,7 +119,7 @@ train %>%
 #boxplot(train$SalePrice ~ train$Neighborhood, main = "Correlation of Sale Price with Neighborhood", xlab = "Name of Neighborhood", ylab = "Sale Price ($)")
 ```
 
-In the first plot, we can look more closely at the first column to gauge the correlation of each of the three chosen predictors on Sale Price. All three predictors seem to be positively correlated with the dependent variable, and all three are at least moderately correlated with `SalePrice`. This means that our intuition that the size of a house is predictive of the price for which it will be sold is correct. Looking more closely at the second plot, it appears that the neighborhood encoded "NRidgHt" has the highest median SalePrice at nearly two times that of many other prevalent neighborhoods. When it comes to interpreting the results of our model, we will likely see that a house in Northridge Heights is predicted to sell for a lot more money than another house, all else equal.
+In the first plot, we can look more closely at the first column to gauge the correlation of each of the three chosen predictors on Sale Price. All three predictors seem to be positively correlated with the dependent variable, and all three are at least moderately correlated with `SalePrice`. This means that our intuition that the size of a house is predictive of the price for which it will be sold is correct. Looking more closely at the second plot, it appears that the neighborhood encoded "NRidgHt" has the highest median `SalePrice` at nearly two times that of many other prevalent neighborhoods. When it comes to interpreting the results of our model, we will likely see that a house in Northridge Heights is predicted to sell for a lot more money than another house, all else equal.
 
 
 ```{r}
@@ -130,7 +129,7 @@ boxplot(SalePrice ~ BldgType, data=train, main = 'Building Type')
 boxplot(SalePrice ~ Exterior1st , data=train, main = 'Exterior covering on house')
 boxplot(SalePrice ~ KitchenQual, data=train, main = 'Kitchen Quality')
 ```
-Taking a look at more the categorical predictors shows that there are definite realtionships between them and the dependent variable, SalePrice. In the top two box plots, it is clear that both categorical predictors have a single category with a large majority of the higher prices houses. Top left represents the houses proximity to various locations such as parks or railroads, while top right categorizes houses based on the type of building it is. Based on intuition and these plots, it is clear that these predictors show high potential for predictive power. Looking at the bottom two plots shows lots of variation between categories of the respective predictors. This is another sign that these predictors could be influential for our final model.
+Taking a look at more of the categorical predictors shows that there are definite relationships between them and the dependent variable, SalePrice. In the top two box plots, it is clear that both categorical predictors have a single category with a large majority of the more highly priced houses. Top left represents the houses proximity to various locations such as parks or railroads, while top right categorizes houses based on the type of building it is. Based on intuition and these plots, it is clear that these predictors show high potential for predictive power. Looking at the bottom two plots shows lots of variation between categories of the respective predictors. This is another sign that these predictors could be influential for our final model.
 
 
 ```{r}
@@ -142,22 +141,181 @@ cm <- cor(numer_data)[38,]
 strong <- abs(cm) > 0.5 & abs(cm) < 1
 cm[strong]
 ```
-Once we've gotten a feel for the dataset and cleaned it up, its important to make sure we understand the variables. Above shows numerical variable's with high correlation (above 0.6) with our dependent variable of Sale Price. The larger the magnitude of a variables correlation, the more predictive power it can add to the model. These are the predictors that we should take some time to understand because most likely they will be used in the final model. Below is a brief summary of what these predictors represent.
+
+Once we've gotten a feel for the dataset and cleaned it up, its important to make sure we understand the variables. Above shows numerical variables with high correlation (above 0.6) with our dependent variable of Sale Price. The larger the magnitude of a variables correlation, the more predictive power it can add to the model. These are the predictors that we should take some time to understand because most likely they will be used in the final model. Below is a brief summary of what these predictors represent.
 
 * OverallQual: Overall Quality quantifies the houses overall material and finish of the house from 1-10  
-* TotalBsmtSF, 1stFlrSF & GrLivArea: Square footage of the entire basement, first floor, and all  living area above ground respectively * YearBuilt & YearRemodAdd: The year that the house was built or remodeled respectively
+* TotalBsmtSF, 1stFlrSF & GrLivArea: Square footage of the entire basement, first floor, and all living area above ground, respectively 
+* YearBuilt & YearRemodAdd: The year that the house was built or remodeled, respectively
 * FullBath: Quantifies the number of full bathrooms above ground
 * TotRmsAbvGrd: Quantifies the number of rooms above ground in the house.
-* GarageCars & GarageArea: Shows the number of cars and Square Footage of the garage respectively  
+* GarageCars & GarageArea: Shows the number of cars and Square Footage of the garage, respectively  
     
   
-Now while all of these variables show moderate to strong relationships with the dependent variable, they also overlap quite a bit. Meaning some of these predictors represent that same thing as others. So variables such as GarageCars and GarageArea are both contributing almost the same information to the model. This is something important to look out for when fitting models.
+Now while all of these variables show moderate to strong relationships with the dependent variable, they also overlap quite a bit. This means that some of these predictors represent that same thing as others. So, variables such as GarageCars and GarageArea are both contributing almost the same information to the model. This is something important to look out for when fitting models.
 
 
 After looking closely at the data, it is clear that the data set contains various predictors that should prove to be useful for modeling the dependent variable. These useful predictors exist as both categorical and numerical variables so choosing a technique that is able to incorporate both would be ideal. Since our dependent variable is continuous, many techniques such as Linear Discriminant Analysis and Logistic Regression were eliminated from the start as they model categorical dependent variables. Our initial considerations for modeling techniques were as follows: Linear Regression, LASSO regression, Ridge Regression, Principal Components Regression, and Partial Least Squares. These techniques were chosen because they work with continuous dependent variables. Furthermore, all techniques except Linear Regression perform model selection in some form. One downside to PCR and PLS is that they only work with numeric predictors. In this case, that would mean eliminating roughly have of the predictors from the start. As proven earlier, we can see that categorical variables show potential so removing them entirely could worsen predictions. 
 
 
 ## Section II: Model Analysis
+
+### PCR and PLS models:
+
+### Initial Considerations
+
+So far there is a lot of character variables that can be interpreted as ordinal, and a lot of numeric variables. These variables are good for techniques that have a lot of quantitative variables that have complex, and perhaps non-linear, relationships among each other. It can potentially eliminate a lot of factors and retain an accurate model. 
+
+It will be important to decide on what factors to convert into numeric values, and what variables to exclude from the model as a whole. 
+
+```{r}
+train %>%
+  dplyr::select(-BsmtFinSF1,-`1stFlrSF`, -GarageCars, -GarageYrBlt)
+```
+
+### Initial PCR model
+
+```{r}
+set.seed(2048)
+pcr.fit = pcr(SalePrice ~., data = train %>%
+                dplyr::select(-BsmtFinSF1,-`1stFlrSF`, -GarageCars, -GarageYrBlt) %>%
+                select_if(is.numeric),
+              scale = TRUE, validation = "CV")
+summary(pcr.fit)
+```
+
+70% of the variation in SalePrice is explained by the first component. It plateaus quickly after that. It would be productive to move over to PLS to get the components that are explaining SalePrice and X, so we only need the first 5-10 components to get up to 80% variability explained in Y, by my estimations. 
+
+Looking at cross validation plot of Mean Squared Error by # of Components. Barely changes after the first couple of components.
+
+```{r}
+validationplot(pcr.fit, val.type = "MSEP")
+```
+
+First PLS model
+
+```{r}
+set.seed(196)
+pls.fit = plsr(SalePrice ~., data = train %>%
+                dplyr::select(-BsmtFinSF1,-`1stFlrSF`, -GarageCars, -GarageYrBlt, -`2ndFlrSF`) %>%
+                select_if(is.numeric),
+              scale = TRUE, validation = "CV") 
+summary(pls.fit)
+```
+
+The first 3 components explain 80.13% of the variation in Y, and it levels off after that. 4-6 would be the most that would be worth considering. It looks like the lowest cross-validation error occurs at 6: 38,315
+
+
+Looking at cross validation plot of Mean Squared Error by # of Components.
+
+```{r}
+validationplot(pls.fit, val.type = "MSEP")
+```
+
+Let's do prediction with the 6 component model.
+
+```{r}
+pls.pred = predict(pls.fit, test, ncomp = 6)
+mean((pls.pred - test$SalePrice)^2)
+sqrt(mean((pls.pred - test$SalePrice)^2))
+```
+
+The prediction is off by an average of $31,478
+
+Comparing 31k against the distribution of `SalePrice` shown below, it's not too bad of a model.
+
+```{r}
+ggplot(data = test, aes(x=SalePrice)) + 
+  geom_boxplot() + 
+  labs(title = "Distribution of all Sale Prices in the data")
+  
+```
+
+
+5 components might be a little better here. 
+
+```{r}
+mean((predict(pls.fit, test, ncomp = 4) - test$SalePrice)^2)
+mean((predict(pls.fit, test, ncomp = 5) - test$SalePrice)^2)
+mean((predict(pls.fit, test, ncomp = 6) - test$SalePrice)^2)
+```
+
+Slightly better MSE, with an average sale price deviation of $31,250
+
+```{r}
+df = data.frame(y = test$SalePrice, x = pls.pred[,1,1])
+ggplot(data = df, aes(x = x, y = y)) + geom_point() + 
+  labs(x = "Predicted Sale Price", y = "Actual Sale Price", title = "Predicted Sale Price vs. Actual Sale Price") + 
+  geom_abline(slope = 1)
+```
+
+There appears to be somewhat of a non-linear relationship at play here. Maybe if we tried to predict the log of the sale price, we could get better results. Besides that, the model is doing a pretty good job.
+
+
+PLS model on the log of Sale Price.
+```{r}
+set.seed(196)
+log.pls.fit = plsr(log(SalePrice) ~., data = train %>%
+                dplyr::select(-BsmtFinSF1,-`1stFlrSF`, -GarageCars, -GarageYrBlt) %>%
+                select_if(is.numeric),
+              scale = TRUE, validation = "CV")
+summary(log.pls.fit)
+```
+
+It looks like the new model is doing a better job of explaining the variance in the response variable. Within 5 components, we are at 86.4%. It looks like the cross validation is telling us to pick 4 components here. Which is more concise than before. 
+
+```{r}
+#Taking the exponentiated predictions as the new prediction matrix
+log.pls.pred = exp(predict(log.pls.fit, test, ncomp = 4))
+mean((log.pls.pred - test$SalePrice)^2)
+sqrt(mean((log.pls.pred - test$SalePrice)^2))
+```
+
+It appears that the MSE is slightly worse than before. Let's look at the data.
+
+
+```{r}
+log.df = data.frame(y = test$SalePrice, x = log.pls.pred[,1,1])
+ggplot(data = log.df, aes(x = x, y = y)) + geom_point() + 
+  labs(x = "Predicted Sale Price", y = "Actual Sale Price") + 
+  geom_abline(slope = 1)
+```
+
+This new relationship appears to be less patterned than before. Although the model appears to still underestimate the more expensive houses. Overall, this looks better, if we don't weigh the effects of the outlier too heavily. 
+
+
+What if we removed the outlier?
+
+```{r}
+test.removed = test[-1082,]
+log.pls.pred.out.removed = exp(predict(log.pls.fit, test.removed, ncomp = 4))
+mean((log.pls.pred.out.removed - test.removed$SalePrice)^2)
+sqrt(mean((log.pls.pred.out.removed - test.removed$SalePrice)^2))
+```
+
+We see that we get a new MSE of 644 million! Which is the best result we have seen up until this point, but we had to remove something to achieve it.
+
+
+Plotting the new graph with the removed point.
+
+```{r}
+log.df.removed = data.frame(y = test.removed$SalePrice, x = log.pls.pred.out.removed[,1,1])
+ggplot(data = log.df.removed, aes(x = x, y = y)) + geom_point() + 
+  labs(x = "Predicted Sale Price", y = "Actual Sale Price", title = "Partial Least Squares on Log of Sale Price Model") + 
+  geom_abline(slope = 1)
+```
+
+Residual plot
+
+```{r}
+library(scales)
+resids = test.removed$SalePrice - log.pls.pred.out.removed[,1,1]
+resids.df = data.frame(x = log.pls.pred.out.removed[,1,1], y = resids)
+ggplot(data = resids.df, aes(x = log.pls.pred.out.removed[,1,1], y = resids)) + 
+  geom_point() + labs(x = "Predicted Sale Price", y = "Residuals", title = "Partial Least Squares on Log of Sale Price Model") +
+  geom_abline(slope = 0) + scale_x_continuous(labels = comma) + scale_y_continuous(labels = comma)
+```
+
 
 ### Lasso Model
 
@@ -229,150 +387,7 @@ r2_outlier <- summary(lm(test_y ~ pred_lasso))
 r2_nooutlier <- summary(lm(y ~ s0, data = no_outlier))
 ```
 
-PCR and PLS models:
+## Conclusions 
 
-## Initial Considerations
+Given the relatively easy interpretability of the coefficients in the LASSO model, and keeping in mind that the LASSO model is able to zero out coefficients that are less predictive of `SalePrice`, it is fair to say that, of the models considered in this study, this one is the most useful when it comes to predicting `SalePrice`. However, it is important to keep in mind that when building statistical models, different models all have their advantages and disadvantages - for example, we may appreciate the Partial Least Squares model discussed above due to the fact that it is computationally less intensive, since we retained only several components out of dozens. Therefore, it is not necessarily productive for us to end our search by declaring that the LASSO model is the "winning" model. Rather, if we were to continue working with housing data, we would seek to employ all the knowledge that we've generated in this report in order to most effectively predict the Sale Price of Houses in Ames, Iowa.
 
-So far there is a lot of character variables that can be interpreted as ordinal, and a lot of numeric variables. These variables are good for techniques that have a lot of quantitative variables that have complex, and perhaps non-linear, relationships among each other. It can potentially eliminate a lot of factors and retain an accurate model. 
-
-It will be important to decide on what factors to convert into numeric values, and what variables to exclude from the model as a whole. 
-
-```{r}
-train %>%
-  dplyr::select(-BsmtFinSF1,-`1stFlrSF`, -GarageCars, -GarageYrBlt)
-```
-
-###Initial PCR model
-```{r}
-set.seed(2048)
-pcr.fit = pcr(SalePrice ~., data = train %>%
-                dplyr::select(-BsmtFinSF1,-`1stFlrSF`, -GarageCars, -GarageYrBlt) %>%
-                select_if(is.numeric),
-              scale = TRUE, validation = "CV")
-summary(pcr.fit)
-```
-70% of the variation in SalePrice is explained by the first component. It plateaus quickly after that. It would be productive to move over to PLS to get the components that are explaining SalePrice and X, so we only need the first 5-10 components to get up to 80% variability explained in Y, by my estimations. 
-
-Looking at cross validation plot of Mean Squared Error by # of Components. Barely changes after the first couple of components.
-```{r}
-validationplot(pcr.fit, val.type = "MSEP")
-```
-
-First PLS model
-```{r}
-set.seed(196)
-pls.fit = plsr(SalePrice ~., data = train %>%
-                dplyr::select(-BsmtFinSF1,-`1stFlrSF`, -GarageCars, -GarageYrBlt, -`2ndFlrSF`) %>%
-                select_if(is.numeric),
-              scale = TRUE, validation = "CV") 
-summary(pls.fit)
-```
-First 3 components explain 80.13% of the variation in Y, and it levels off after that. 4-6 would be the most that would be worth considering. It looks like the lowest cross-validation error occurs at 6: 38,315
-
-
-Looking at cross validation plot of Mean Squared Error by # of Components.
-```{r}
-validationplot(pls.fit, val.type = "MSEP")
-```
-
-Lets do prediction with the 6 component model.
-
-```{r}
-pls.pred = predict(pls.fit, test, ncomp = 6)
-
-mean((pls.pred - test$SalePrice)^2)
-
-sqrt(mean((pls.pred - test$SalePrice)^2))
-```
-The prediction is off by an average of $31,478
-
-Comparing 31k against the distribution of 'SalePrice' shown below, it's not too bad of a model.
-```{r}
-ggplot(data = test, aes(x=SalePrice)) + geom_boxplot()
-```
-
-
-5 components might be a little better here. 
-
-```{r}
-mean((predict(pls.fit, test, ncomp = 4) - test$SalePrice)^2)
-mean((predict(pls.fit, test, ncomp = 5) - test$SalePrice)^2)
-mean((predict(pls.fit, test, ncomp = 6) - test$SalePrice)^2)
-```
-Slightly better MSE, with an average sale price deviation of $31,250
-
-```{r}
-df = data.frame(y = test$SalePrice, x = pls.pred[,1,1])
-
-ggplot(data = df, aes(x = x, y = y)) + geom_point() + 
-  labs(x = "Predicted Sale Price", y = "Actual Sale Price") + 
-  geom_abline(slope = 1)
-```
-There appears to be somewhat of a non-linear relationship at play here. Maybe if we tried to predict the log of the sale price, we could get better results. Besides that, the model is doing a pretty good job.
-
-
-PLS model on the log of Sale Price.
-```{r}
-set.seed(196)
-log.pls.fit = plsr(log(SalePrice) ~., data = train %>%
-                dplyr::select(-BsmtFinSF1,-`1stFlrSF`, -GarageCars, -GarageYrBlt) %>%
-                select_if(is.numeric),
-              scale = TRUE, validation = "CV")
-summary(log.pls.fit)
-```
-It looks like the new model is doing a better job of explaining the variance in the response variable. Within 5 components, we are at 86.4%. It looks like the cross validation is telling us to pick 4 components here. Which is more concise than before. 
-
-```{r}
-#Taking the exponentiated predictions as the new prediction matrix
-log.pls.pred = exp(predict(log.pls.fit, test, ncomp = 4))
-
-mean((log.pls.pred - test$SalePrice)^2)
-
-sqrt(mean((log.pls.pred - test$SalePrice)^2))
-```
-It appears that the MSE is slightly worse than before. Let's look at the data.
-
-
-```{r}
-log.df = data.frame(y = test$SalePrice, x = log.pls.pred[,1,1])
-
-ggplot(data = log.df, aes(x = x, y = y)) + geom_point() + 
-  labs(x = "Predicted Sale Price", y = "Actual Sale Price") + 
-  geom_abline(slope = 1)
-```
-This new relationship appears to be less patterned than before. Although the model appears to still underestimate the more expensive houses. Overall, this looks better, if we don't weigh the effects of the outlier too heavily. 
-
-
-What if we removed the outlier?
-```{r}
-test.removed = test[-1082,]
-
-log.pls.pred.out.removed = exp(predict(log.pls.fit, test.removed, ncomp = 4))
-
-mean((log.pls.pred.out.removed - test.removed$SalePrice)^2)
-
-sqrt(mean((log.pls.pred.out.removed - test.removed$SalePrice)^2))
-```
-We see that we get a new MSE of 644 million! Which is the best result we have seen up until this point, but we had to remove something to achieve it.
-
-
-Plotting the new graph with the removed point.
-```{r}
-log.df.removed = data.frame(y = test.removed$SalePrice, x = log.pls.pred.out.removed[,1,1])
-
-ggplot(data = log.df.removed, aes(x = x, y = y)) + geom_point() + 
-  labs(x = "Predicted Sale Price", y = "Actual Sale Price", title = "Partial Least Squares on Log of Sale Price Model") + 
-  geom_abline(slope = 1)
-```
-
-Residual plot
-```{r}
-library(scales)
-resids = test.removed$SalePrice - log.pls.pred.out.removed[,1,1]
-
-resids.df = data.frame(x = log.pls.pred.out.removed[,1,1], y = resids)
-
-ggplot(data = resids.df, aes(x = log.pls.pred.out.removed[,1,1], y = resids)) + 
-  geom_point() + labs(x = "Predicted Sale Price", y = "Residuals", title = "Partial Least Squares on Log of Sale Price Model") +
-  geom_abline(slope = 0) + scale_x_continuous(labels = comma) + scale_y_continuous(labels = comma)
-```
